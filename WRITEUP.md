@@ -71,27 +71,40 @@ source /opt/intel/openvino/bin/setupvars.sh -pyver 3.5
 
 ### with video file
  - with person-detection-retail-0013 model
-        Inference time : 47FPS
-        Total Count : 11 
+        Inference time : 47 ms
+        Total Count : 6
+        Average Duration : 16
+
+![person-detection-retail-0013](./images/person-detection-retail-0013-model.png)
 
         python main.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m ./intel/person-detection-retail-0013/FP32/person-detection-retail-0013.xml  -l /opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libcpu_extension_sse4.so -d CPU -pt 0.6 | ffmpeg -v warning -f rawvideo -pixel_format bgr24 -video_size 768x432 -framerate 24 -i - http://0.0.0.0:3004/fac.ffm
 
- - with Faster R-CNN Inception V2 COCO model
-        does not working propery
-
-        python main.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m public/faster_rcnn_inception_v2_coco/faster_rcnn_inception_v2_coco_2018_01_28/frozen_inference_graph.xml -l /opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libcpu_extension_sse4.so -d CPU -pt 0.6 | ffmpeg -v warning -f rawvideo -pixel_format bgr24 -video_size 768x432 -framerate 24 -i - http://0.0.0.0:3004/fac.ffm
-
 - with SSD MobileNet V2 COCO model
-      Inference time : 72FPS
-      Total Count : 34
+      Inference time : 72 ms
+      Total Count : 8
+      Average Duration : 00:12
 
-      python main.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m public/ssd_mobilenet_v2_coco/ssd_mobilenet_v2_coco_2018_03_29/frozen_inference_graph.xml -l /opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libcpu_extension_sse4.so -d CPU -pt 0.6 | ffmpeg -v warning -f rawvideo -pixel_format bgr24 -video_size 768x432 -framerate 24 -i - http://0.0.0.0:3004/fac.ffm
+![SSD MobileNet V2 COCO](./images/ssd-mobilenet-v2.png)
+
+      python main.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m public/ssd_mobilenet_v2_coco/ssd_mobilenet_v2_coco_2018_03_29/frozen_inference_graph.xml -l /opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libcpu_extension_sse4.so -d CPU -pt 0.3 | ffmpeg -v warning -f rawvideo -pixel_format bgr24 -video_size 768x432 -framerate 24 -i - http://0.0.0.0:3004/fac.ffm
 
 - with SSD Lite MobileNet V2 COCO model
-      Inference time : 47FPS
-      Total Count : 41
+      Inference time : 31 ms
+      Total Count : 8
+      Average Duration : 00:11
 
-      python main.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m public/ssdlite_mobilenet_v2/ssdlite_mobilenet_v2_coco_2018_05_09/frozen_inference_graph.xml -l /opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libcpu_extension_sse4.so -d CPU -pt 0.6 | ffmpeg -v warning -f rawvideo -pixel_format bgr24 -video_size 768x432 -framerate 24 -i - http://0.0.0.0:3004/fac.ffm
+![SSD Lite MobileNet V2 COCO](images/ssd-lilte-mobile-v2.png)
+
+      python main.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m public/ssdlite_mobilenet_v2/ssdlite_mobilenet_v2_coco_2018_05_09/frozen_inference_graph.xml -l /opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libcpu_extension_sse4.so -d CPU -pt 0.3 | ffmpeg -v warning -f rawvideo -pixel_format bgr24 -video_size 768x432 -framerate 24 -i - http://0.0.0.0:3004/fac.ffm
+
+ - with SSD 300 Model
+      Inference time : 894 ms
+      Total Count : 0
+      Average Duration : 0
+
+![SSD300](images/ssd300.png)
+
+        python main.py -i resources/Pedestrian_Detect_2_1_1.mp4 -m public/ssd300/models/VGGNet/VOC0712Plus/SSD_300x300_ft/VGG_VOC0712Plus_SSD_300x300_ft_iter_160000.xml -l /opt/intel/openvino/deployment_tools/inference_engine/lib/intel64/libcpu_extension_sse4.so -d CPU -pt 0.2 | ffmpeg -v warning -f rawvideo -pixel_format bgr24 -video_size 768x432 -framerate 24 -i - http://0.0.0.0:3004/fac.ffm
 
 ### with webcam
 
@@ -106,24 +119,18 @@ https://docs.openvinotoolkit.org/2019_R3/_docs_MO_DG_prepare_model_convert_model
 
 In investigating potential people counter models, I tried each of the following three models:
 
-- Model 1: [Faster R-CNN Inception V2 COCO]
-  - download with openvino downloader
+- Model 1: [SSD 300]
 
         cd /opt/intel/openvino/deployment_tools/tools/model_downloader
-        ./downloader.py --name faster_rcnn_inception_v2_coco -o /home/workspace/
-  
-  - I converted the model to an Intermediate Representation with the following arguments.
 
-        cd /home/workspace/public/faster_rcnn_inception_v2_coco/faster_rcnn_inception_v2_coco_2018_01_28
+        ./downloader.py --name ssd300 -o /home/workspace/
+
 
         python /opt/intel/openvino/deployment_tools/model_optimizer/mo.py \
-         --input_model frozen_inference_graph.pb  \
-         --reverse_input_channels  \
-         --tensorflow_object_detection_api_pipeline_config pipeline.config   \
-         --tensorflow_use_custom_operations_config /opt/intel/openvino/deployment_tools/model_optimizer/extensions/front/tf/faster_rcnn_support.json
+          --input_model VGG_VOC0712Plus_SSD_300x300_ft_iter_160000.caffemodel \
+          --input_proto deploy.prototxt
 
-  - Genarated IR model, **frozen_inference_graph.xml** and **frozen_inference_graph.bin** in **/public/faster_rcnn_inception_v2_coco/faster_rcnn_inception_v2_coco_2018_01_28** directory
-
+  - Genarated IR model, **VGG_VOC0712Plus_SSD_300x300_ft_iter_160000.xml** and **VGG_VOC0712Plus_SSD_300x300_ft_iter_160000.bin** in **/home/workspace/public/ssd300/models/VGGNet/VOC0712Plus/SSD_300x300_ft** directory
   
 - Model 2: [SSD MobileNet V2 coco]
   - download with openvino downloader
@@ -162,5 +169,6 @@ In investigating potential people counter models, I tried each of the following 
         --tensorflow_use_custom_operations_config /opt/intel/openvino/deployment_tools/model_optimizer/extensions/front/tf/ssd_v2_support.json
 
   - Generated IR model **frozen_inference_graph.xml** and **frozen_inference_graph.bin** in /**public/ssdlite_mobilenet_v2/ssdlite_mobilenet_v2_coco_2018_05_0/**
+
 
 

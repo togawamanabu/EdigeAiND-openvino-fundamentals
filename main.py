@@ -26,13 +26,14 @@ import time
 import socket
 import json
 import cv2
+import numpy as np
 
 import logging
 import paho.mqtt.client as mqtt
 
 from argparse import ArgumentParser
 from inference import Network
-
+from collections import deque
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -100,6 +101,9 @@ def infer_on_stream(args, client):
     last_count = 0
     total_count = 0
     start_time = 0
+    frame_count = 0
+    FPS = 10
+    count_stblizer = deque(maxlen=FPS)
 
     ### TODO: Load the model through `infer_network` ###
     ifvalues  = infer_network.load_model(model=args.model, device=args.device, cpu_extension=args.cpu_extension)
@@ -110,11 +114,13 @@ def infer_on_stream(args, client):
     if args.input == 'CAM':
         input_stream = 0
     elif args.input.endswith('.jpg') or args.input.endswith('.bmp') :
+        ## LOAD A SINGLE IMAGE TO INFERENCE
         input_stream = args.input
         single_image_mode = True
     else:
         input_stream = args.input
 
+    #THIS CODE LOAD SINGLE IMAGE OR VIDEO OR CAMRRA STREAM
     cap = cv2.VideoCapture(input_stream)
     cap.open(input_stream)
     
@@ -152,8 +158,7 @@ def infer_on_stream(args, client):
             result = infer_network.get_output()
 
             ### TODO: Extract any desired stats from the results ###
-            out_frame, current_count = ssd_out(frame, result, prob_threshold, infer_network.person_id, initial_w, initial_h )
-                        
+            out_frame, current_count = ssd_out(frame, result, prob_threshold, infer_network.person_id, initial_w, initial_h )                        
             inf_time_message = "Inference time: {:.3f}ms"\
                                .format(det_time * 1000)
             cv2.putText(frame, inf_time_message, (15, 15),
@@ -164,22 +169,34 @@ def infer_on_stream(args, client):
             ### TODO: Calculate and send relevant information on ###            
             ### current_count, total_count and duration to the MQTT server ###                     
             ### Topic "person": keys of "count" and "total" ###
-            ### Topic "person/duration": key of "duration" ###                        
+            ### Topic "person/duration": key of "duration" ###      
             
+            ## stablize count
+            count_stblizer.append(current_count)
+            
+            if FPS <= len(count_stblizer):
+                ## most offen number in frames
+                mon = np.argmax(np.bincount(count_stblizer))
+                
+                current_count = int(mon)
+                                    
             if current_count > last_count:
-                start_time = time.time()
+                frame_count = 0
                 total_count = total_count + current_count - last_count
-                client.publish("person", json.dumps({"total": total_count}))
+
+                client.publish("person", json.dumps({"total":total_count}))
 
             # Person duration in the video is calculated
             if current_count < last_count:
-                duration = int(time.time() - start_time)
+                duration = frame_count / FPS
                 # Publish messages to the MQTT server
                 client.publish("person/duration",
                                json.dumps({"duration": duration}))
                 
             client.publish("person", json.dumps({"count": current_count}))
+            
             last_count = current_count
+            frame_count += 1
             
             if key_pressed == 27:
                 break
@@ -208,6 +225,8 @@ def ssd_out(frame, result, prob_threshold, person_id, initial_w, initial_h):
     for obj in result[0][0]:
         # Draw bounding box for object when it's probability is more than
         #  the specified threshold
+        
+        #logging.debug(obj[2])
         
         if obj[1] == person_id and obj[2] > prob_threshold:
             xmin = int(obj[3] * initial_w)
